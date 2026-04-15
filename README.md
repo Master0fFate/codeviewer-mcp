@@ -28,3 +28,11 @@ npm run dev
 
 - `MCP_PROJECT_PATH` (optional): project root path for AST indexing
 - `MCP_REVIEWER_DB_PATH` (optional): SQLite database file path
+
+## Auditor framework artifact
+
+This repository includes an audited and remediated prompt artifact at:
+
+- `prompts/universal-auditor-general-v2.1.md`
+
+The v2.1 version incorporates the reported fixes for instruction consistency, flexible recommendation counts, cross-domain specificity examples, confidence calibration, and comparative-context compliance behavior.
