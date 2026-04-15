@@ -2,9 +2,12 @@
   "name": "codeviewer-mcp",
   "version": "1.0.0",
   "description": "MCP server",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run"
   },
   "repository": {
     "type": "git",
@@ -13,7 +16,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/Master0fFate/codeviewer-mcp/issues"
   },
@@ -26,6 +29,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/babel__traverse": "^7.28.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",

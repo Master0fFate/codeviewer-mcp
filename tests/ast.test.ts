@@ -1,0 +1,41 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { AstContextEngine } from "../src/ast.js";
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0, tempDirs.length)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+describe("AstContextEngine", () => {
+  it("localizes target node context", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "ast-engine-"));
+    tempDirs.push(tempDir);
+
+    const srcDir = path.join(tempDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+
+    const filePath = path.join(srcDir, "demo.ts");
+    writeFileSync(
+      filePath,
+      `import { x } from "./x";\nexport function targetFn(name: string) {\n  return name.toUpperCase();\n}\n`,
+      "utf8",
+    );
+
+    const engine = new AstContextEngine(tempDir);
+    const context = engine.localizeContext({
+      targetFile: "src/demo.ts",
+      targetNode: "targetFn",
+      codeChunk: "function targetFn() {}",
+    });
+
+    expect(context.nodeReference).toBe("targetFn");
+    expect(context.parentScope).toContain("targetFn");
+    expect(context.imports).toContain("./x");
+  });
+});
