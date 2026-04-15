@@ -181,7 +181,7 @@ Example entry:
 }
 ```
 
-### Droid (Factory)
+### Droid(Factory)
 
 1. Open Droid(Factory) MCP connector configuration.
 2. Add a local STDIO server entry.
@@ -201,7 +201,7 @@ Use the canonical JSON block shown above.
 
 Use the canonical JSON block shown above.
 
-> Note: client config schema and config file location can vary by version. If your harness expects different key names, map the same command/args/env values into its schema.
+> Note: client config schema and config file location can vary by version. If your MCP client expects different key names, map the same command/args/env values into its schema.
 
 ## Verification checklist after integration
 
