@@ -181,13 +181,13 @@ Example entry:
 }
 ```
 
-### Droid(Factory)
+### Droid(factory)
 
-1. Open Droid(Factory) MCP connector configuration.
+1. Open Droid(factory) MCP connector configuration.
 2. Add a local STDIO server entry.
 3. Use `node` as command and `dist/index.js` as the argument.
 4. Configure environment variables for project/database paths.
-5. Restart Droid(Factory) runtime and verify tool availability.
+5. Restart Droid(factory) runtime and verify tool availability.
 
 Use the canonical JSON block shown above.
 
