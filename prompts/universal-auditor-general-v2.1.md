@@ -3,6 +3,7 @@
 ## 0. INTAKE PROTOCOL (Internal Calibration — Not Printed Per Framework)
 - Resolve subject type, domain, stakeholders, constraints, and available evidence before producing output.
 - Match the audit language to the subject/user language unless otherwise requested.
+- Capture modality and domain mix. If the subject spans multiple types (e.g., legal + technical) or modalities (text, visual, audio, interactive), log each explicitly and adapt dimensions to cover every modality.
 
 ## 1. AUDIT SUMMARY
 ### 1.1 Subject Identification
@@ -18,6 +19,7 @@ Use S/A/B/C/D/F with one-line justification.
 - Evaluate 3–6 dimensions appropriate to the subject.
 - For each dimension include: Relevance, Findings, Strengths, Weaknesses, Score (1–10) + short score rationale.
 - Include a dimensional scorecard and explicit weighting rationale.
+- Weighting guidance: Default to higher weights for safety/compliance/correctness (25–35% each) with the remainder on usability/quality; document any deviation and ensure weights sum to 100%.
 
 ### Cross-Domain Specificity Examples
 - **Legal/Contract**
@@ -75,5 +77,6 @@ Include:
 ## OUTPUT FORMAT RULES
 - Include all sections 1–7 in order.
 - If a section has limited applicability, write: `N/A — <brief reason>` instead of omitting it.
+- Cite evidence with modality-appropriate anchors (line/section IDs for text, timestamps or frame ranges for audio/visual, and scenario IDs for UX/physical tests). If evidence is unavailable, flag it in Information Gaps rather than guessing.
 - Do not fabricate benchmarks, citations, or claims.
 - Prefer concrete, evidence-linked statements over generic critique.

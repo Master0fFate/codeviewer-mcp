@@ -11,6 +11,7 @@ It is designed for clients that can run MCP servers over **STDIO** (local comman
 - AST-based context localization for JS/TS code
 - Deterministic preflight checks (TypeScript diagnostics + basic security pattern checks)
 - Structured review output with verdicts, categorized feedback, and optional search/replace patch suggestions
+- Universal Auditor General prompt v2.1 with cross-domain specificity examples, weighting guidance, and modality-aware evidence rules (`prompts/universal-auditor-general-v2.1.md`)
 
 ## MCP tools exposed by the server
 
