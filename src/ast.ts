@@ -151,7 +151,7 @@ export class AstContextEngine {
     }
     const targetDirectoryRealPath = realpathSync(targetDirectory);
     if (!this.isWithinProjectRoot(targetDirectoryRealPath)) {
-      throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
+      throw new Error(`target_file directory must resolve within project root: ${this.projectRoot}`);
     }
 
     const targetFileStats = statSync(absoluteTarget, { throwIfNoEntry: false });
