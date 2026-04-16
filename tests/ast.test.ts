@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -56,6 +56,30 @@ describe("AstContextEngine", () => {
       engine.localizeContext({
         targetFile: externalFile,
         codeChunk: "export const x = 1;",
+      }),
+    ).toThrow(/within project root/);
+  });
+
+  it("rejects symlink paths that resolve outside project root", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "ast-engine-"));
+    tempDirs.push(tempDir);
+
+    const outsideDir = mkdtempSync(path.join(os.tmpdir(), "ast-engine-outside-"));
+    tempDirs.push(outsideDir);
+    writeFileSync(path.join(outsideDir, "outside.ts"), "export const outside = true;", "utf8");
+
+    const linkPath = path.join(tempDir, "linked-outside");
+    try {
+      symlinkSync(outsideDir, linkPath, "dir");
+    } catch {
+      return;
+    }
+
+    const engine = new AstContextEngine(tempDir);
+    expect(() =>
+      engine.localizeContext({
+        targetFile: "linked-outside/outside.ts",
+        codeChunk: "export const outside = true;",
       }),
     ).toThrow(/within project root/);
   });

@@ -30,6 +30,17 @@ export class AstContextEngine {
     this.reindex();
   }
 
+  private normalizeForComparison(inputPath: string): string {
+    const normalized = path.normalize(inputPath);
+    return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  }
+
+  private isWithinProjectRoot(candidatePath: string): boolean {
+    const root = this.normalizeForComparison(this.projectRoot);
+    const candidate = this.normalizeForComparison(candidatePath);
+    return candidate === root || candidate.startsWith(`${root}${path.sep}`);
+  }
+
   public reindex(): void {
     this.index.clear();
     for (const filePath of this.collectFiles(this.projectPath)) {
@@ -139,8 +150,7 @@ export class AstContextEngine {
       throw new Error(`Target directory does not exist for ${absoluteTarget}`);
     }
     const targetDirectoryRealPath = realpathSync(targetDirectory);
-    const relativeTarget = path.relative(this.projectRoot, targetDirectoryRealPath);
-    if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget)) {
+    if (!this.isWithinProjectRoot(targetDirectoryRealPath)) {
       throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
     }
 
