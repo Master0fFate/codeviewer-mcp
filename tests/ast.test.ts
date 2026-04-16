@@ -60,7 +60,8 @@ describe("AstContextEngine", () => {
     ).toThrow(/within project root/);
   });
 
-  it("rejects symlink paths that resolve outside project root", () => {
+  const symlinkTest = process.platform === "win32" ? it.skip : it;
+  symlinkTest("rejects symlink paths that resolve outside project root", () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "ast-engine-"));
     tempDirs.push(tempDir);
 
@@ -69,11 +70,7 @@ describe("AstContextEngine", () => {
     writeFileSync(path.join(outsideDir, "outside.ts"), "export const outside = true;", "utf8");
 
     const linkPath = path.join(tempDir, "linked-outside");
-    try {
-      symlinkSync(outsideDir, linkPath, "dir");
-    } catch {
-      return;
-    }
+    symlinkSync(outsideDir, linkPath, "dir");
 
     const engine = new AstContextEngine(tempDir);
     expect(() =>

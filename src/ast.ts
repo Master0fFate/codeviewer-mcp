@@ -154,6 +154,14 @@ export class AstContextEngine {
       throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
     }
 
+    const targetFileStats = statSync(absoluteTarget, { throwIfNoEntry: false });
+    if (targetFileStats?.isFile()) {
+      const targetFileRealPath = realpathSync(absoluteTarget);
+      if (!this.isWithinProjectRoot(targetFileRealPath)) {
+        throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
+      }
+    }
+
     const indexed = this.index.get(absoluteTarget);
     if (!indexed) {
       return {
