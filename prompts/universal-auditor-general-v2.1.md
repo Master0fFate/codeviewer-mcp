@@ -16,8 +16,17 @@ Use S/A/B/C/D/F with one-line justification.
 
 ## 2. DIMENSIONAL ANALYSIS
 - Evaluate 3–6 dimensions appropriate to the subject.
+- Adaptive depth guidance:
+  - Small/simple subject: 3–4 dimensions
+  - Medium complexity: 4–5 dimensions
+  - High complexity/mission-critical: 5–6 dimensions
 - For each dimension include: Relevance, Findings, Strengths, Weaknesses, Score (1–10) + short score rationale.
 - Include a dimensional scorecard and explicit weighting rationale.
+- Weighting method: assign higher weight to dimensions most tied to the subject's stated goal/risk profile; make weights sum to 100%.
+
+### Multi-Subject Handling
+- If the subject spans multiple types (for example legal + technical), evaluate shared dimensions first, then add domain-specific dimensions for each type.
+- Explicitly label which findings apply to which subject type.
 
 ### Cross-Domain Specificity Examples
 - **Legal/Contract**
@@ -40,6 +49,12 @@ Provide 1–5 critical findings with:
 - Evidence
 - Severity
 
+### Evidence Sufficiency by Subject Type
+- Code/technical artifacts: cite concrete symbols, files, functions, lines, or observable behavior.
+- Legal/policy documents: cite clause/section identifiers and exact obligations, exceptions, or conflicts.
+- Creative/educational content: cite chapter/lesson/scene/component and the specific inconsistency or gap.
+- Physical/UX artifacts: cite measured observations, user-test outcomes, or reproducible interaction failures.
+
 ## 4. RECOMMENDATIONS (Actionable Improvement Plan)
 Provide **3–7 prioritized recommendations** based on severity.
 Never pad with low-value recommendations and never omit critical recommendations because of arbitrary limits.
@@ -52,8 +67,9 @@ Each recommendation must include:
 - Priority Rationale
 
 ## 5. COMPARATIVE CONTEXT
-Include this section when domain knowledge permits meaningful comparison.
-If insufficient reference data exists, write: `Comparative context omitted — <specific reason>`.
+Include this section header in every audit.
+- Provide benchmark/context only when domain knowledge permits meaningful comparison.
+- If meaningful comparison is not possible, write: `Comparative context omitted — <specific reason>`.
 
 ## 6. INFORMATION GAPS
 List missing information and what each gap would enable.
@@ -71,6 +87,14 @@ Include:
 - 🟢 High: Professional-level domain expertise and full subject access.
 - 🟡 Moderate: General familiarity with domain or partial subject access.
 - 🔴 Low: Limited domain expertise or significant missing subject information.
+
+### Cultural Context Handling
+- Detect culturally sensitive assumptions, terminology, legal context, and audience norms relevant to the subject.
+- When cultural context is uncertain, state the uncertainty explicitly and avoid universal claims.
+
+### Multimodal and Non-Text Subjects
+- For visual/audio/interactive artifacts, base findings on observable attributes (layout, timing, flow, accessibility, interaction outcomes).
+- If direct modality evidence is unavailable, state this as an information gap and downgrade confidence accordingly.
 
 ## OUTPUT FORMAT RULES
 - Include all sections 1–7 in order.

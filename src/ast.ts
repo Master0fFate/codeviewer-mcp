@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import type { File, Statement } from "@babel/types";
@@ -21,11 +21,29 @@ interface IndexedFile {
 
 export class AstContextEngine {
   private readonly projectPath: string;
+  private readonly projectRoot: string;
   private readonly index = new Map<string, IndexedFile>();
 
   public constructor(projectPath: string) {
     this.projectPath = projectPath;
+    try {
+      this.projectRoot = realpathSync(path.resolve(projectPath));
+    } catch (error) {
+      throw new Error(`Invalid or inaccessible project path: ${projectPath}`, { cause: error });
+    }
     this.reindex();
+  }
+
+  private normalizeForComparison(inputPath: string): string {
+    // Windows filesystems are typically case-insensitive; normalize case there for safe containment checks.
+    const normalized = path.normalize(inputPath);
+    return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  }
+
+  private isWithinProjectRoot(candidatePath: string): boolean {
+    const root = this.normalizeForComparison(this.projectRoot);
+    const candidate = this.normalizeForComparison(candidatePath);
+    return candidate === root || candidate.startsWith(`${root}${path.sep}`);
   }
 
   public reindex(): void {
@@ -132,8 +150,21 @@ export class AstContextEngine {
     codeChunk: string;
   }): AstLocalizationResult {
     const absoluteTarget = path.resolve(this.projectPath, input.targetFile);
-    if (!statSync(path.dirname(absoluteTarget), { throwIfNoEntry: false })?.isDirectory()) {
+    const targetDirectory = path.dirname(absoluteTarget);
+    if (!statSync(targetDirectory, { throwIfNoEntry: false })?.isDirectory()) {
       throw new Error(`Target directory does not exist for ${absoluteTarget}`);
+    }
+    const targetDirectoryRealPath = realpathSync(targetDirectory);
+    if (!this.isWithinProjectRoot(targetDirectoryRealPath)) {
+      throw new Error(`target_file directory must resolve within project root: ${this.projectRoot}`);
+    }
+
+    const targetFileStats = statSync(absoluteTarget, { throwIfNoEntry: false });
+    if (targetFileStats?.isFile()) {
+      const targetFileRealPath = realpathSync(absoluteTarget);
+      if (!this.isWithinProjectRoot(targetFileRealPath)) {
+        throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
+      }
     }
 
     const indexed = this.index.get(absoluteTarget);

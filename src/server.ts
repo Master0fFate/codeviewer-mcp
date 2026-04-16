@@ -1,4 +1,5 @@
 import path from "node:path";
+import { statSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerPlanInputSchema, registerPlanOutputSchema, reviewCodeChunkInputSchema, reviewCodeChunkOutputSchema } from "./schemas.js";
 import { StateStore } from "./state.js";
@@ -14,7 +15,7 @@ export interface CodeReviewerServerOptions {
 export class CodeReviewerServer {
   public readonly mcp: McpServer;
   private readonly state: StateStore;
-  private readonly ast: AstContextEngine;
+  private readonly astByProjectPath = new Map<string, AstContextEngine>();
 
   public constructor(options: CodeReviewerServerOptions) {
     this.mcp = new McpServer({
@@ -23,9 +24,21 @@ export class CodeReviewerServer {
     });
 
     this.state = new StateStore(options.dbPath);
-    this.ast = new AstContextEngine(options.projectPath);
+    this.getAstEngine(path.resolve(options.projectPath));
 
     this.registerTools(options.projectPath);
+  }
+
+  private getAstEngine(projectPath: string): AstContextEngine {
+    const normalizedProjectPath = path.resolve(projectPath);
+    const existing = this.astByProjectPath.get(normalizedProjectPath);
+    if (existing) {
+      return existing;
+    }
+
+    const engine = new AstContextEngine(normalizedProjectPath);
+    this.astByProjectPath.set(normalizedProjectPath, engine);
+    return engine;
   }
 
   private registerTools(defaultProjectPath: string): void {
@@ -39,6 +52,11 @@ export class CodeReviewerServer {
       async (input) => {
         const parsed = registerPlanInputSchema.parse(input);
         const projectPath = path.resolve(parsed.project_path ?? defaultProjectPath);
+        if (!statSync(projectPath, { throwIfNoEntry: false })?.isDirectory()) {
+          throw new Error(`project_path must be an existing directory: ${projectPath}`);
+        }
+
+        this.getAstEngine(projectPath);
         const sessionId = this.state.createSession(projectPath, parsed.steps);
 
         return {
@@ -76,9 +94,10 @@ export class CodeReviewerServer {
           throw new Error(`Unknown plan_step ${parsed.plan_step} for session ${parsed.session_id}`);
         }
 
-        this.ast.reindex();
+        const ast = this.getAstEngine(session.project_path);
+        ast.reindex();
 
-        const astContext = this.ast.localizeContext(
+        const astContext = ast.localizeContext(
           parsed.target_node
             ? {
                 targetFile: parsed.target_file,
