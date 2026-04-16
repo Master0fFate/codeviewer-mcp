@@ -26,11 +26,16 @@ export class AstContextEngine {
 
   public constructor(projectPath: string) {
     this.projectPath = projectPath;
-    this.projectRoot = realpathSync(path.resolve(projectPath));
+    try {
+      this.projectRoot = realpathSync(path.resolve(projectPath));
+    } catch (error) {
+      throw new Error(`Invalid or inaccessible project path: ${projectPath}`, { cause: error });
+    }
     this.reindex();
   }
 
   private normalizeForComparison(inputPath: string): string {
+    // Windows filesystems are typically case-insensitive; normalize case there for safe containment checks.
     const normalized = path.normalize(inputPath);
     return process.platform === "win32" ? normalized.toLowerCase() : normalized;
   }
