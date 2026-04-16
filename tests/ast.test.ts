@@ -38,4 +38,17 @@ describe("AstContextEngine", () => {
     expect(context.parentScope).toContain("targetFn");
     expect(context.imports).toContain("./x");
   });
+
+  it("rejects target files that escape project root", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "ast-engine-"));
+    tempDirs.push(tempDir);
+
+    const engine = new AstContextEngine(tempDir);
+    expect(() =>
+      engine.localizeContext({
+        targetFile: "../outside.ts",
+        codeChunk: "export const x = 1;",
+      }),
+    ).toThrow(/within project root/);
+  });
 });

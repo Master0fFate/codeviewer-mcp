@@ -21,10 +21,12 @@ interface IndexedFile {
 
 export class AstContextEngine {
   private readonly projectPath: string;
+  private readonly projectRoot: string;
   private readonly index = new Map<string, IndexedFile>();
 
   public constructor(projectPath: string) {
     this.projectPath = projectPath;
+    this.projectRoot = path.resolve(projectPath);
     this.reindex();
   }
 
@@ -132,6 +134,11 @@ export class AstContextEngine {
     codeChunk: string;
   }): AstLocalizationResult {
     const absoluteTarget = path.resolve(this.projectPath, input.targetFile);
+    const relativeTarget = path.relative(this.projectRoot, absoluteTarget);
+    if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget)) {
+      throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
+    }
+
     if (!statSync(path.dirname(absoluteTarget), { throwIfNoEntry: false })?.isDirectory()) {
       throw new Error(`Target directory does not exist for ${absoluteTarget}`);
     }
