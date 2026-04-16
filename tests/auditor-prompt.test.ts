@@ -34,6 +34,21 @@ describe("Universal Auditor prompt v2.1 remediation", () => {
 
   it("makes comparative context mandatory with explicit escape hatch", () => {
     expect(prompt).toContain("## 5. COMPARATIVE CONTEXT");
+    expect(prompt).toContain("Include this section in every audit.");
     expect(prompt).toContain("Comparative context omitted — <specific reason>");
+  });
+
+  it("adds weighting and adaptive depth guidance", () => {
+    expect(prompt).toContain("Adaptive depth guidance");
+    expect(prompt).toContain("Small/simple subject: 3–4 dimensions");
+    expect(prompt).toContain("Weighting method");
+    expect(prompt).toContain("sum to 100%");
+  });
+
+  it("adds domain-spanning evidence and multimodal guidance", () => {
+    expect(prompt).toContain("### Multi-Subject Handling");
+    expect(prompt).toContain("### Evidence Sufficiency by Subject Type");
+    expect(prompt).toContain("### Cultural Context Handling");
+    expect(prompt).toContain("### Multimodal and Non-Text Subjects");
   });
 });
