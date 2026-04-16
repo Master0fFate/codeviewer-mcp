@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import type { File, Statement } from "@babel/types";
@@ -26,7 +26,7 @@ export class AstContextEngine {
 
   public constructor(projectPath: string) {
     this.projectPath = projectPath;
-    this.projectRoot = path.resolve(projectPath);
+    this.projectRoot = realpathSync(path.resolve(projectPath));
     this.reindex();
   }
 
@@ -134,13 +134,14 @@ export class AstContextEngine {
     codeChunk: string;
   }): AstLocalizationResult {
     const absoluteTarget = path.resolve(this.projectPath, input.targetFile);
-    const relativeTarget = path.relative(this.projectRoot, absoluteTarget);
+    const targetDirectory = path.dirname(absoluteTarget);
+    if (!statSync(targetDirectory, { throwIfNoEntry: false })?.isDirectory()) {
+      throw new Error(`Target directory does not exist for ${absoluteTarget}`);
+    }
+    const targetDirectoryRealPath = realpathSync(targetDirectory);
+    const relativeTarget = path.relative(this.projectRoot, targetDirectoryRealPath);
     if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget)) {
       throw new Error(`target_file must resolve within project root: ${this.projectRoot}`);
-    }
-
-    if (!statSync(path.dirname(absoluteTarget), { throwIfNoEntry: false })?.isDirectory()) {
-      throw new Error(`Target directory does not exist for ${absoluteTarget}`);
     }
 
     const indexed = this.index.get(absoluteTarget);

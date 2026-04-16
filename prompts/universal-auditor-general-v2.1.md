@@ -67,9 +67,9 @@ Each recommendation must include:
 - Priority Rationale
 
 ## 5. COMPARATIVE CONTEXT
-Include this section in every audit.
-- When domain knowledge permits meaningful comparison, provide benchmark/context.
-- If insufficient reference data exists, write: `Comparative context omitted — <specific reason>`.
+Include this section header in every audit.
+- Provide benchmark/context only when domain knowledge permits meaningful comparison.
+- If meaningful comparison is not possible, write: `Comparative context omitted — <specific reason>`.
 
 ## 6. INFORMATION GAPS
 List missing information and what each gap would enable.

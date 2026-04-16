@@ -50,5 +50,13 @@ describe("AstContextEngine", () => {
         codeChunk: "export const x = 1;",
       }),
     ).toThrow(/within project root/);
+
+    const externalFile = path.join(os.tmpdir(), "outside.ts");
+    expect(() =>
+      engine.localizeContext({
+        targetFile: externalFile,
+        codeChunk: "export const x = 1;",
+      }),
+    ).toThrow(/within project root/);
   });
 });

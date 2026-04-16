@@ -34,7 +34,7 @@ describe("Universal Auditor prompt v2.1 remediation", () => {
 
   it("makes comparative context mandatory with explicit escape hatch", () => {
     expect(prompt).toContain("## 5. COMPARATIVE CONTEXT");
-    expect(prompt).toContain("Include this section in every audit.");
+    expect(prompt).toContain("Include this section header in every audit.");
     expect(prompt).toContain("Comparative context omitted — <specific reason>");
   });
 
