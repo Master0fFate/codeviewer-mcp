@@ -1,11 +1,13 @@
 import type { Feedback, Patch, ReviewCodeChunkInput, ReviewCodeChunkOutput } from "./schemas.js";
 import type { AstLocalizationResult } from "./ast.js";
 import type { PreflightResult } from "./preflight.js";
+import type { PromptProfile } from "./prompts.js";
 
 export interface ReviewContext {
   stepDescription: string;
   preflight: PreflightResult;
   astContext: AstLocalizationResult;
+  promptProfile?: Pick<PromptProfile, "id" | "title" | "headings">;
 }
 
 function buildPatches(input: ReviewCodeChunkInput, preflight: PreflightResult): Patch[] {
@@ -54,6 +56,22 @@ export function reviewCodeChunk(input: ReviewCodeChunkInput, ctx: ReviewContext)
     });
   }
 
+  if (ctx.promptProfile) {
+    skillHints.push({
+      severity: "info",
+      category: "prompt_profile",
+      message: `Active prompt profile: ${ctx.promptProfile.id} (${ctx.promptProfile.title})`,
+    });
+
+    if (ctx.promptProfile.headings.length > 0) {
+      skillHints.push({
+        severity: "info",
+        category: "prompt_profile",
+        message: `Prompt focus sections: ${ctx.promptProfile.headings.join(", ")}`,
+      });
+    }
+  }
+
   if (ctx.preflight.hasBlockingIssues) {
     return {
       verdict: "NEEDS_WORK",
@@ -61,6 +79,9 @@ export function reviewCodeChunk(input: ReviewCodeChunkInput, ctx: ReviewContext)
       feedback: [...feedback, ...skillHints],
       patches,
       plan_step_status: "IN_PROGRESS",
+      active_prompt_profile: ctx.promptProfile?.id,
+      active_prompt_title: ctx.promptProfile?.title,
+      active_prompt_headings: ctx.promptProfile?.headings,
     };
   }
 
@@ -78,5 +99,8 @@ export function reviewCodeChunk(input: ReviewCodeChunkInput, ctx: ReviewContext)
     ],
     patches,
     plan_step_status: "VALIDATED",
+    active_prompt_profile: ctx.promptProfile?.id,
+    active_prompt_title: ctx.promptProfile?.title,
+    active_prompt_headings: ctx.promptProfile?.headings,
   };
 }

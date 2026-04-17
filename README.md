@@ -20,7 +20,9 @@ It runs over STDIO and is designed for MCP clients and LLM harnesses that can la
 4. `cleanup_session`
 5. `list_sessions`
 6. `list_indexing_errors`
-7. `health_check`
+7. `list_prompt_profiles`
+8. `get_prompt_profile`
+9. `health_check`
 
 ## Prerequisites
 
@@ -63,6 +65,8 @@ pnpm dev
 | --- | --- | --- |
 | `MCP_PROJECT_PATH` | Project root for AST indexing and path containment checks | Current working directory |
 | `MCP_REVIEWER_DB_PATH` | SQLite database path | `<MCP_PROJECT_PATH>/.codeviewer-mcp.sqlite` |
+| `MCP_PROMPTS_DIR` | Directory containing `*.md` prompt profiles | `<server_root>/prompts` |
+| `MCP_DEFAULT_PROMPT_PROFILE` | Default prompt profile ID used when `register_plan` omits `prompt_profile` | `universal-auditor-general-v2.1` if present, else first profile |
 | `MCP_SESSION_TTL_HOURS` | Session TTL in hours, positive integer only | `168` |
 | `MCP_AUTH_TOKEN` | Optional bearer token for shared environments. If set, every tool call must include `auth_token`. | unset |
 | `MCP_CLEANUP_ON_STARTUP` | Cleanup expired sessions on process start (`true` or `false`) | `false` |
@@ -87,6 +91,38 @@ Authentication example when `MCP_AUTH_TOKEN` is set:
   "code_chunk": "export const ok = true;",
   "modification_type": "MODIFY",
   "auth_token": "your-shared-secret"
+}
+```
+
+## Prompt profile workflow (compartmentalized prompts)
+
+This MCP now supports session-level prompt compartmentalization from the `prompts` folder.
+
+- Add prompt files as `*.md` in the prompts directory.
+- Profile ID is the filename without extension.
+  - Example: `prompts/cybersec.md` -> `prompt_profile: "cybersec"`
+- Start a session with `register_plan` and optional `prompt_profile`.
+- The selected profile is persisted on the session and reused for every `review_code_chunk` call in that session.
+- `review_code_chunk` output includes:
+  - `active_prompt_profile`
+  - `active_prompt_title`
+  - `active_prompt_headings`
+
+Use helper tools:
+
+- `list_prompt_profiles` to see available profiles.
+- `get_prompt_profile` to read full prompt content for a profile.
+
+Example `register_plan` payload with specialization profile:
+
+```json
+{
+  "project_path": "/absolute/path/to/repo",
+  "prompt_profile": "cybersec",
+  "steps": [
+    "Review auth and secrets handling",
+    "Check unsafe execution paths"
+  ]
 }
 ```
 
@@ -207,7 +243,7 @@ If field names differ, map the same values into your client schema.
 
 - [ ] Server starts without process errors
 - [ ] Client reports MCP connection established
-- [ ] Tools visible: `register_plan`, `review_code_chunk`, `cleanup_expired_sessions`, `cleanup_session`, `list_sessions`, `list_indexing_errors`, `health_check`
+- [ ] Tools visible: `register_plan`, `review_code_chunk`, `cleanup_expired_sessions`, `cleanup_session`, `list_sessions`, `list_indexing_errors`, `list_prompt_profiles`, `get_prompt_profile`, `health_check`
 - [ ] `register_plan` returns a valid `session_id`
 - [ ] `review_code_chunk` returns structured verdict output
 - [ ] `health_check` reports healthy database/session status

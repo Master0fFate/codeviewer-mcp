@@ -7,12 +7,14 @@ export const severityTypes = ["critical", "high", "medium", "low", "info"] as co
 export const registerPlanInputSchema = z.object({
   project_path: z.string().min(1).optional(),
   steps: z.array(z.string().min(1)).min(1),
+  prompt_profile: z.string().min(1).optional(),
 });
 
 export const registerPlanOutputSchema = z.object({
   session_id: z.uuid(),
   steps_registered: z.number().int().positive(),
   status: z.literal("ACTIVE"),
+  prompt_profile: z.string().min(1).optional(),
 });
 
 export const reviewCodeChunkInputSchema = z.object({
@@ -45,6 +47,9 @@ export const reviewCodeChunkOutputSchema = z.object({
   feedback: z.array(feedbackSchema),
   patches: z.array(patchSchema),
   plan_step_status: z.enum(["PENDING", "IN_PROGRESS", "VALIDATED"]),
+  active_prompt_profile: z.string().min(1).optional(),
+  active_prompt_title: z.string().min(1).optional(),
+  active_prompt_headings: z.array(z.string().min(1)).optional(),
 });
 
 export type RegisterPlanInput = z.infer<typeof registerPlanInputSchema>;

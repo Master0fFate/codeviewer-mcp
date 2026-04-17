@@ -29,4 +29,18 @@ describe("StateStore", () => {
 
     store.close();
   });
+
+  it("persists prompt profile on session records", () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "state-store-"));
+    tempDirs.push(tempDir);
+    const dbPath = path.join(tempDir, "state.sqlite");
+
+    const store = new StateStore(dbPath);
+    const sessionId = store.createSession("/project", ["step 1"], "cybersec");
+    const session = store.getSession(sessionId);
+
+    expect(session?.prompt_profile).toBe("cybersec");
+
+    store.close();
+  });
 });

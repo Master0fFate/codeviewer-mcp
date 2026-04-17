@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CodeReviewerServer } from "./server.js";
 import { createLogger } from "./logger.js";
@@ -7,9 +8,12 @@ import { parseOptionalPositiveIntegerEnv } from "./config.js";
 const logger = createLogger();
 
 async function main(): Promise<void> {
+  const serverRootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const projectPath = path.resolve(process.env.MCP_PROJECT_PATH ?? process.cwd());
   const dbPath = path.resolve(process.env.MCP_REVIEWER_DB_PATH ?? path.join(projectPath, ".codeviewer-mcp.sqlite"));
+  const promptsDirPath = path.resolve(process.env.MCP_PROMPTS_DIR ?? path.join(serverRootPath, "prompts"));
   const sessionTtlHours = parseOptionalPositiveIntegerEnv(process.env.MCP_SESSION_TTL_HOURS, "MCP_SESSION_TTL_HOURS");
+  const defaultPromptProfile = process.env.MCP_DEFAULT_PROMPT_PROFILE?.trim() || undefined;
   const authToken = process.env.MCP_AUTH_TOKEN;
 
   if (authToken) {
@@ -21,7 +25,9 @@ async function main(): Promise<void> {
   const server = new CodeReviewerServer({
     projectPath,
     dbPath,
+    promptsDirPath,
     sessionTtlHours,
+    defaultPromptProfile,
     authToken,
     logger,
   });
@@ -46,7 +52,7 @@ async function main(): Promise<void> {
     process.exit(0);
   });
 
-  logger.info("Starting MCP server", { projectPath, dbPath, sessionTtlHours });
+  logger.info("Starting MCP server", { projectPath, dbPath, promptsDirPath, sessionTtlHours, defaultPromptProfile });
   await server.mcp.connect(transport);
 }
 

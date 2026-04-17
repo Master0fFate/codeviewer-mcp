@@ -9,11 +9,14 @@ import { runPreflightChecks } from "./preflight.js";
 import { reviewCodeChunk } from "./reviewer.js";
 import type { Logger } from "./logger.js";
 import { createLogger } from "./logger.js";
+import { PromptRegistry } from "./prompts.js";
 
 export interface CodeReviewerServerOptions {
   projectPath: string;
   dbPath: string;
+  promptsDirPath: string;
   sessionTtlHours?: number;
+  defaultPromptProfile?: string;
   authToken?: string;
   logger?: Logger;
 }
@@ -25,11 +28,15 @@ export class CodeReviewerServer {
   private readonly logger: Logger;
   private readonly authToken: string | undefined;
   private readonly defaultProjectPath: string;
+  private readonly promptRegistry: PromptRegistry;
+  private readonly defaultPromptProfile: string | undefined;
 
   public constructor(options: CodeReviewerServerOptions) {
     this.logger = options.logger ?? createLogger();
     this.defaultProjectPath = path.resolve(options.projectPath);
     this.authToken = options.authToken;
+    this.promptRegistry = new PromptRegistry(path.resolve(options.promptsDirPath), this.logger);
+    this.defaultPromptProfile = options.defaultPromptProfile;
 
     this.mcp = new McpServer({
       name: "codeviewer-mcp-reviewer",
@@ -99,21 +106,34 @@ export class CodeReviewerServer {
           throw new Error(`project_path must be an existing directory: ${projectPath}`);
         }
 
-        this.getAstEngine(projectPath);
-        const sessionId = this.state.createSession(projectPath, parsed.steps);
+        const selectedPromptProfile = this.promptRegistry.resolveProfileId(parsed.prompt_profile, this.defaultPromptProfile);
+        if (parsed.prompt_profile && !selectedPromptProfile) {
+          const availableProfiles = this.promptRegistry.listProfiles().map((profile) => profile.id);
+          throw new Error(
+            `Unknown prompt_profile: ${parsed.prompt_profile}. Available profiles: ${availableProfiles.join(", ") || "none"}.`,
+          );
+        }
 
-        this.logger.info(`Session created: ${sessionId}`, { projectPath, steps: parsed.steps.length });
+        this.getAstEngine(projectPath);
+        const sessionId = this.state.createSession(projectPath, parsed.steps, selectedPromptProfile ?? "");
+
+        this.logger.info(`Session created: ${sessionId}`, {
+          projectPath,
+          steps: parsed.steps.length,
+          promptProfile: selectedPromptProfile ?? "none",
+        });
 
         return {
           structuredContent: {
             session_id: sessionId,
             steps_registered: parsed.steps.length,
             status: "ACTIVE",
+            ...(selectedPromptProfile ? { prompt_profile: selectedPromptProfile } : {}),
           },
           content: [
             {
               type: "text",
-              text: `Registered session ${sessionId} with ${parsed.steps.length} plan steps.`,
+              text: `Registered session ${sessionId} with ${parsed.steps.length} plan steps${selectedPromptProfile ? ` using prompt profile ${selectedPromptProfile}` : ""}.`,
             },
           ],
         };
@@ -157,10 +177,22 @@ export class CodeReviewerServer {
         );
 
         const preflight = runPreflightChecks(parsed.code_chunk);
+        const promptProfile = session.prompt_profile
+          ? this.promptRegistry.getProfile(session.prompt_profile)
+          : undefined;
+
+        if (session.prompt_profile && !promptProfile) {
+          this.logger.warn("Session prompt profile is no longer available on disk", {
+            sessionId: parsed.session_id,
+            promptProfile: session.prompt_profile,
+          });
+        }
+
         const review = reviewCodeChunk(parsed, {
           stepDescription: step.description,
           preflight,
           astContext,
+          promptProfile,
         });
 
         const chunkId = this.state.logCodeChunk({
@@ -186,6 +218,7 @@ export class CodeReviewerServer {
           verdict: review.verdict,
           filesIndexed: reindexResult.filesIndexed,
           filesFailed: reindexResult.filesFailed,
+          promptProfile: (review.active_prompt_profile ?? session.prompt_profile) || "none",
         } as unknown as Record<string, unknown>);
 
         return {
@@ -193,7 +226,7 @@ export class CodeReviewerServer {
           content: [
             {
               type: "text",
-              text: `Review verdict: ${review.verdict}. Critical issues: ${review.critical_issues}.`,
+              text: `Review verdict: ${review.verdict}. Critical issues: ${review.critical_issues}.${review.active_prompt_profile ? ` Prompt profile: ${review.active_prompt_profile}.` : ""}`,
             },
           ],
         };
@@ -301,6 +334,64 @@ export class CodeReviewerServer {
     );
 
     this.mcp.registerTool(
+      "list_prompt_profiles",
+      {
+        description: "List available prompt profiles from the prompts directory.",
+        inputSchema: this.withAuthInputShape(z.object({}).shape),
+      },
+      async (input) => {
+        this.assertAuthenticated(input);
+        const profiles = this.promptRegistry.listProfiles();
+        return {
+          structuredContent: {
+            profiles,
+            default_prompt_profile: this.promptRegistry.resolveProfileId(undefined, this.defaultPromptProfile),
+          },
+          content: [
+            {
+              type: "text",
+              text: profiles.length > 0
+                ? `Available prompt profiles: ${profiles.map((profile) => profile.id).join(", ")}`
+                : "No prompt profiles found in prompts directory.",
+            },
+          ],
+        };
+      },
+    );
+
+    this.mcp.registerTool(
+      "get_prompt_profile",
+      {
+        description: "Get full prompt content for a prompt profile ID.",
+        inputSchema: this.withAuthInputShape(z.object({ profile_id: z.string().min(1) }).shape),
+      },
+      async (input) => {
+        this.assertAuthenticated(input);
+        const parsed = z.object({ profile_id: z.string().min(1) }).parse(input);
+        const profile = this.promptRegistry.getProfile(parsed.profile_id);
+        if (!profile) {
+          throw new Error(`Unknown profile_id: ${parsed.profile_id}`);
+        }
+
+        return {
+          structuredContent: {
+            id: profile.id,
+            title: profile.title,
+            file_name: profile.fileName,
+            headings: profile.headings,
+            content: profile.content,
+          },
+          content: [
+            {
+              type: "text",
+              text: `Loaded prompt profile ${profile.id} (${profile.title}).`,
+            },
+          ],
+        };
+      },
+    );
+
+    this.mcp.registerTool(
       "health_check",
       {
         description: "Check the health and status of the MCP server and database.",
@@ -317,6 +408,10 @@ export class CodeReviewerServer {
           structuredContent: {
             status: "healthy",
             database: dbInfo,
+            prompts: {
+              total: this.promptRegistry.listProfiles().length,
+              defaultPromptProfile: this.promptRegistry.resolveProfileId(undefined, this.defaultPromptProfile),
+            },
             sessions: {
               total: sessions.length,
               active: sessions.filter((s) => s.status === "ACTIVE").length,

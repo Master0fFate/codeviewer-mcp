@@ -6,6 +6,7 @@ export type PlanStepStatus = "PENDING" | "IN_PROGRESS" | "VALIDATED";
 export interface SessionRecord {
   id: string;
   project_path: string;
+  prompt_profile: string;
   created_at: string;
   expires_at: string;
   status: "ACTIVE" | "COMPLETED";
@@ -131,6 +132,7 @@ export class StateStore {
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
         project_path TEXT NOT NULL,
+        prompt_profile TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         expires_at TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'COMPLETED'))
@@ -172,15 +174,22 @@ export class StateStore {
     } catch {
       // Column already exists, ignore error
     }
+
+    // Add prompt_profile column if upgrading from older schema
+    try {
+      this.db.exec(`ALTER TABLE sessions ADD COLUMN prompt_profile TEXT NOT NULL DEFAULT ''`);
+    } catch {
+      // Column already exists, ignore error
+    }
   }
 
-  public createSession(projectPath: string, steps: string[]): string {
+  public createSession(projectPath: string, steps: string[], promptProfile = ""): string {
     const sessionId = randomUUID();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.sessionTtlHours * 60 * 60 * 1000);
 
     const insertSession = this.db.prepare(
-      `INSERT INTO sessions(id, project_path, created_at, expires_at, status) VALUES (?, ?, ?, ?, 'ACTIVE')`,
+      `INSERT INTO sessions(id, project_path, prompt_profile, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
     );
     const insertStep = this.db.prepare(
       `INSERT INTO execution_plans(session_id, step_number, description, status) VALUES (?, ?, ?, 'PENDING')`,
@@ -188,7 +197,7 @@ export class StateStore {
 
     this.executeWithRetry(() => {
       const tx = this.db.transaction(() => {
-        insertSession.run(sessionId, projectPath, now.toISOString(), expiresAt.toISOString());
+        insertSession.run(sessionId, projectPath, promptProfile, now.toISOString(), expiresAt.toISOString());
         steps.forEach((step, index) => {
           insertStep.run(sessionId, index + 1, step);
         });
@@ -202,7 +211,7 @@ export class StateStore {
   public getSession(sessionId: string): SessionRecord | undefined {
     return this.executeWithRetry(() => {
       const row = this.db
-        .prepare(`SELECT id, project_path, created_at, expires_at, status FROM sessions WHERE id = ?`)
+        .prepare(`SELECT id, project_path, prompt_profile, created_at, expires_at, status FROM sessions WHERE id = ?`)
         .get(sessionId);
       if (!row) return undefined;
       return row as SessionRecord;
@@ -332,8 +341,8 @@ export class StateStore {
   public listSessions(status?: "ACTIVE" | "COMPLETED"): Array<SessionRecord & { expires_at: string }> {
     return this.executeWithRetry(() => {
       const query = status
-        ? `SELECT id, project_path, created_at, expires_at, status FROM sessions WHERE status = ? ORDER BY created_at DESC`
-        : `SELECT id, project_path, created_at, expires_at, status FROM sessions ORDER BY created_at DESC`;
+        ? `SELECT id, project_path, prompt_profile, created_at, expires_at, status FROM sessions WHERE status = ? ORDER BY created_at DESC`
+        : `SELECT id, project_path, prompt_profile, created_at, expires_at, status FROM sessions ORDER BY created_at DESC`;
       const stmt = this.db.prepare(query);
       const result = status ? stmt.all(status) : stmt.all();
       return result as Array<SessionRecord & { expires_at: string }>;
