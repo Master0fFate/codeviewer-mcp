@@ -276,4 +276,4 @@ pnpm build
 
 ## License
 
-MIT
+GNU v3
