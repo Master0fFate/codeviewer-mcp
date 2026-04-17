@@ -1,7 +1,7 @@
 {
   "name": "codeviewer-mcp",
   "version": "1.0.0",
-  "description": "MCP server",
+  "description": "Stateful, AST-aware MCP code review server",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -15,7 +15,10 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "bugs": {
     "url": "https://github.com/Master0fFate/codeviewer-mcp/issues"
@@ -29,6 +32,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@babel/types": "^7.29.0",
+    "@types/babel__core": "^7.20.5",
     "@types/babel__traverse": "^7.28.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",

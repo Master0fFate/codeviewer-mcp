@@ -2,170 +2,169 @@
 
 `codeviewer-mcp` is a TypeScript MCP server for stateful, AST-aware code review workflows.
 
-It is designed for clients that can run MCP servers over **STDIO** (local command execution) and call tools in iterative review loops.
+It runs over STDIO and is designed for MCP clients and LLM harnesses that can launch local MCP servers.
 
-## What this repository provides
+## What this server provides
 
-- A local MCP server process (`dist/index.js`) that exposes review tools
-- Stateful review sessions stored in SQLite
-- AST-based context localization for JS/TS code
-- Deterministic preflight checks (TypeScript diagnostics + basic security pattern checks)
-- Structured review output with verdicts, categorized feedback, and optional search/replace patch suggestions
+- MCP tools for iterative plan registration and code-chunk review
+- SQLite-backed review sessions and history
+- AST indexing/context localization for JS/TS source trees
+- Preflight checks (TypeScript diagnostics + security pattern detection)
+- Structured review output with verdicts, categorized feedback, and optional patch hints
 
-## MCP tools exposed by the server
+## MCP tools
 
-### 1) `register_plan`
-Registers a review session and its ordered plan steps.
+1. `register_plan`
+2. `review_code_chunk`
+3. `cleanup_expired_sessions`
+4. `cleanup_session`
+5. `list_sessions`
+6. `list_indexing_errors`
+7. `health_check`
 
-Input:
-- `project_path` (optional string)
-- `steps` (string array, required, at least 1)
+## Prerequisites
 
-Output:
-- `session_id` (UUID)
-- `steps_registered` (number)
-- `status` (`ACTIVE`)
+These prerequisites are required for this MCP to install and run correctly.
 
-### 2) `review_code_chunk`
-Reviews one code chunk against a specific plan step.
+| Requirement | Why it is needed |
+| --- | --- |
+| Node.js 20+ | Runtime for server and MCP SDK |
+| pnpm 9+ | Dependency install and build workflow |
+| Git | Clone/update repository for auto-install flows |
+| Native build toolchain | Required by `better-sqlite3` native module |
 
-Input:
-- `session_id` (UUID)
-- `plan_step` (positive integer)
-- `target_file` (string)
-- `code_chunk` (string)
-- `modification_type` (`INSERT` | `MODIFY` | `DELETE` | `REPLACE`)
-- `target_node` (optional string)
-- `active_skills` (optional string array)
+Native build toolchain by OS:
 
-Output:
-- `verdict` (`PASS` or `NEEDS_WORK`)
-- `critical_issues` (number)
-- `feedback` (array)
-- `patches` (array)
-- `plan_step_status` (`PENDING` | `IN_PROGRESS` | `VALIDATED`)
+- Windows: Visual Studio Build Tools 2022 (Desktop development with C++) + Python 3
+- macOS: Xcode Command Line Tools (`xcode-select --install`)
+- Linux (Debian/Ubuntu): `build-essential python3 make g++`
 
-## Runtime behavior
+If native builds are missing, `pnpm install` can fail while compiling `better-sqlite3`.
 
-- On startup, the server initializes a SQLite database (default: `.codeviewer-mcp.sqlite` in project root).
-- For each `review_code_chunk` request, the server:
-  1. Validates the session and plan step
-  2. Re-indexes project AST context
-  3. Runs preflight checks on the submitted chunk
-  4. Produces a structured review response
-  5. Logs chunk + review data and updates plan step status
-
-## Requirements
-
-- Node.js 20+ (recommended)
-- npm
-- Build tools required by native Node modules (for `better-sqlite3`)
-
-## Installation (manual/local)
-
-This repository is intended to run as a local MCP server process.
-
-1. Clone the repository
+## Quick start
 
 ```bash
 git clone https://github.com/Master0fFate/codeviewer-mcp.git
 cd codeviewer-mcp
+pnpm install
+pnpm build
+pnpm start
 ```
 
-2. Install dependencies
+Development mode:
 
 ```bash
-npm install
-```
-
-3. Build
-
-```bash
-npm run build
-```
-
-4. Start server
-
-```bash
-npm start
-```
-
-Development mode (no prebuild step):
-
-```bash
-npm run dev
+pnpm dev
 ```
 
 ## Environment variables
 
-- `MCP_PROJECT_PATH` (optional): project root used for AST indexing. Defaults to current working directory.
-- `MCP_REVIEWER_DB_PATH` (optional): SQLite DB path. Defaults to `<MCP_PROJECT_PATH>/.codeviewer-mcp.sqlite`.
+| Variable | Description | Default |
+| --- | --- | --- |
+| `MCP_PROJECT_PATH` | Project root for AST indexing and path containment checks | Current working directory |
+| `MCP_REVIEWER_DB_PATH` | SQLite database path | `<MCP_PROJECT_PATH>/.codeviewer-mcp.sqlite` |
+| `MCP_SESSION_TTL_HOURS` | Session TTL in hours, positive integer only | `168` |
+| `MCP_AUTH_TOKEN` | Optional bearer token for shared environments. If set, every tool call must include `auth_token`. | unset |
+| `MCP_CLEANUP_ON_STARTUP` | Cleanup expired sessions on process start (`true` or `false`) | `false` |
+| `LOG_LEVEL` | Log level (`trace`, `debug`, `info`, `warn`, `error`) | `info` |
 
 Example:
 
 ```bash
-MCP_PROJECT_PATH=/absolute/path/to/target/repo \
-MCP_REVIEWER_DB_PATH=/absolute/path/to/reviewer.sqlite \
+MCP_PROJECT_PATH=/absolute/path/to/repo \
+MCP_SESSION_TTL_HOURS=24 \
+LOG_LEVEL=info \
 node dist/index.js
 ```
 
-## Installing into MCP clients / LLM harnesses
+Authentication example when `MCP_AUTH_TOKEN` is set:
 
-The server uses **STDIO transport**, so integration is done by registering a local command.
+```json
+{
+  "session_id": "11111111-1111-1111-1111-111111111111",
+  "plan_step": 1,
+  "target_file": "src/example.ts",
+  "code_chunk": "export const ok = true;",
+  "modification_type": "MODIFY",
+  "auth_token": "your-shared-secret"
+}
+```
 
-### Canonical command
+## LLM auto-install guide
 
-Use this command in your MCP client configuration:
+This section is written for autonomous LLM installers and MCP harnesses.
+
+### Canonical server launch
 
 ```text
 node /absolute/path/to/codeviewer-mcp/dist/index.js
 ```
 
-Recommended args/env form:
+### Idempotent install/update (bash)
 
-```json
-{
-  "command": "node",
-  "args": ["/absolute/path/to/codeviewer-mcp/dist/index.js"],
-  "env": {
-    "MCP_PROJECT_PATH": "/absolute/path/to/target/project",
-    "MCP_REVIEWER_DB_PATH": "/absolute/path/to/target/project/.codeviewer-mcp.sqlite"
-  }
-}
+```bash
+set -euo pipefail
+INSTALL_ROOT="${HOME}/mcp-servers"
+SERVER_DIR="${INSTALL_ROOT}/codeviewer-mcp"
+
+mkdir -p "${INSTALL_ROOT}"
+if [ ! -d "${SERVER_DIR}/.git" ]; then
+  git clone https://github.com/Master0fFate/codeviewer-mcp.git "${SERVER_DIR}"
+else
+  git -C "${SERVER_DIR}" pull --ff-only
+fi
+
+cd "${SERVER_DIR}"
+pnpm install
+pnpm build
 ```
 
----
+### Idempotent install/update (PowerShell)
 
-### Claude Code
+```powershell
+$InstallRoot = Join-Path $HOME "mcp-servers"
+$ServerDir = Join-Path $InstallRoot "codeviewer-mcp"
 
-1. Open your Claude Code MCP/server configuration file.
-2. Add a new server entry using the canonical STDIO command.
-3. Set `MCP_PROJECT_PATH` to the repository Claude Code should review.
-4. Save config and restart Claude Code.
-5. Confirm the server appears and exposes `register_plan` and `review_code_chunk`.
+New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+if (-not (Test-Path (Join-Path $ServerDir ".git"))) {
+  git clone https://github.com/Master0fFate/codeviewer-mcp.git $ServerDir
+} else {
+  git -C $ServerDir pull --ff-only
+}
 
-Example server block:
+Set-Location $ServerDir
+pnpm install
+pnpm build
+```
+
+## Harness installation (Claude Code, VS Code Copilot, OpenCode, generic MCP)
+
+Use the same STDIO launch values in every harness.
+
+Canonical server block:
 
 ```json
 {
   "name": "codeviewer-mcp",
+  "transport": "stdio",
   "command": "node",
   "args": ["/absolute/path/to/codeviewer-mcp/dist/index.js"],
   "env": {
-    "MCP_PROJECT_PATH": "/absolute/path/to/repo"
+    "MCP_PROJECT_PATH": "/absolute/path/to/target/repo",
+    "MCP_REVIEWER_DB_PATH": "/absolute/path/to/target/repo/.codeviewer-mcp.sqlite",
+    "LOG_LEVEL": "info"
   }
 }
 ```
 
-### OpenCode
+### Claude Code / Claude Desktop
 
-1. Open OpenCode MCP settings.
-2. Register a new STDIO MCP server named `codeviewer-mcp`.
-3. Point `command`/`args` to your built `dist/index.js`.
-4. Provide `MCP_PROJECT_PATH` in environment settings.
-5. Restart OpenCode and validate tool discovery.
+1. Open Claude MCP config.
+2. Add `codeviewer-mcp` under `mcpServers` with the canonical command/args/env values.
+3. Restart Claude.
+4. Verify tools are discoverable.
 
-Example entry:
+Example:
 
 ```json
 {
@@ -181,63 +180,63 @@ Example entry:
 }
 ```
 
-### Droid(factory)
+### VS Code Copilot (MCP)
 
-1. Open Droid(factory) MCP connector configuration.
-2. Add a local STDIO server entry.
-3. Use `node` as command and `dist/index.js` as the argument.
-4. Configure environment variables for project/database paths.
-5. Restart Droid(factory) runtime and verify tool availability.
+1. Open VS Code MCP server management (UI or JSON settings, depending on version).
+2. Register a local STDIO MCP server named `codeviewer-mcp`.
+3. Set command `node`, point args to built `dist/index.js`, and set `MCP_PROJECT_PATH`.
+4. Reload VS Code window if required by your extension version.
+5. Confirm tool discovery in Copilot Chat MCP tools list.
 
-Use the canonical JSON block shown above.
+If your version supports JSON settings, map the canonical server block into your MCP settings schema.
 
-### Kilo Code CLI
+### OpenCode
 
-1. Open Kilo Code CLI MCP configuration.
-2. Add a new server alias (for example `codeviewer-mcp`).
-3. Register the same STDIO launch command.
-4. Set `MCP_PROJECT_PATH` for the target repository.
-5. Restart the CLI session and list MCP tools to confirm connection.
+1. Open OpenCode MCP configuration.
+2. Add a local STDIO server named `codeviewer-mcp`.
+3. Use `node` + built `dist/index.js`.
+4. Set `MCP_PROJECT_PATH` and optional DB/log env vars.
+5. Restart OpenCode and verify tools appear.
 
-Use the canonical JSON block shown above.
+### Generic MCP clients
 
-> Note: client config schema and config file location can vary by version. If your MCP client expects different key names, map the same command/args/env values into its schema.
+Any client that supports local STDIO MCP servers can use the canonical block above.
+If field names differ, map the same values into your client schema.
 
-## Verification checklist after integration
+## Verification checklist
 
-- Server process starts without error
-- Client shows connected MCP server
-- Tools discovered:
-  - `register_plan`
-  - `review_code_chunk`
-- A sample `register_plan` call returns a `session_id`
-- A sample `review_code_chunk` call returns a structured verdict
+- [ ] Server starts without process errors
+- [ ] Client reports MCP connection established
+- [ ] Tools visible: `register_plan`, `review_code_chunk`, `cleanup_expired_sessions`, `cleanup_session`, `list_sessions`, `list_indexing_errors`, `health_check`
+- [ ] `register_plan` returns a valid `session_id`
+- [ ] `review_code_chunk` returns structured verdict output
+- [ ] `health_check` reports healthy database/session status
 
 ## Development and validation
 
-Run tests:
-
 ```bash
-npm test
+pnpm test
+pnpm build
 ```
 
-Build:
+## Security notes
 
-```bash
-npm run build
-```
+- Path containment checks prevent escaping the configured project root, including symlink-based escapes.
+- Authentication is optional (`MCP_AUTH_TOKEN`) and should be enabled in shared environments.
+- Sessions expire automatically based on `MCP_SESSION_TTL_HOURS`.
+- SQLite is configured with WAL mode and foreign keys enabled.
 
 ## Repository layout
 
-- `/src/index.ts` - process entrypoint and STDIO transport
-- `/src/server.ts` - MCP server + tool registration
-- `/src/schemas.ts` - zod schemas for tool contracts
-- `/src/state.ts` - SQLite state store
+- `/src/index.ts` - Process entrypoint and STDIO transport
+- `/src/server.ts` - MCP server and tool registration
+- `/src/schemas.ts` - Zod tool contract schemas
+- `/src/state.ts` - SQLite state store and session lifecycle
 - `/src/ast.ts` - AST indexing and context localization
-- `/src/preflight.ts` - static preflight checks
-- `/src/reviewer.ts` - review decision + output shaping
-- `/tests` - vitest test suite
-- `/prompts/universal-auditor-general-v2.1.md` - audited prompt artifact
+- `/src/preflight.ts` - Static preflight checks
+- `/src/reviewer.ts` - Review decision and output shaping
+- `/src/logger.ts` - Structured logging
+- `/tests` - Vitest test suite
 
 ## License
 

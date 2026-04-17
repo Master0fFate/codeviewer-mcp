@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import type { File, Statement } from "@babel/types";
+import type { Logger } from "./logger.js";
 
 const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 
@@ -10,6 +11,16 @@ export interface AstLocalizationResult {
   imports: string[];
   parentScope: string;
   nodeReference: string | null;
+}
+
+export interface IndexingError {
+  filePath: string;
+  error: string;
+}
+
+export interface ReindexResult {
+  filesIndexed: number;
+  filesFailed: number;
 }
 
 interface IndexedFile {
@@ -23,9 +34,12 @@ export class AstContextEngine {
   private readonly projectPath: string;
   private readonly projectRoot: string;
   private readonly index = new Map<string, IndexedFile>();
+  private readonly indexingErrors = new Map<string, string>();
+  private readonly logger: Logger | undefined;
 
-  public constructor(projectPath: string) {
+  public constructor(projectPath: string, logger?: Logger) {
     this.projectPath = projectPath;
+    this.logger = logger;
     try {
       this.projectRoot = realpathSync(path.resolve(projectPath));
     } catch (error) {
@@ -46,11 +60,24 @@ export class AstContextEngine {
     return candidate === root || candidate.startsWith(`${root}${path.sep}`);
   }
 
-  public reindex(): void {
+  public reindex(): ReindexResult {
     this.index.clear();
+    this.indexingErrors.clear();
+
+    let filesIndexed = 0;
+    let filesFailed = 0;
+
     for (const filePath of this.collectFiles(this.projectPath)) {
-      this.indexFile(filePath);
+      if (this.indexFile(filePath)) {
+        filesIndexed++;
+      } else {
+        filesFailed++;
+      }
     }
+
+    this.logger?.info("AST reindex completed", { filesIndexed, filesFailed });
+
+    return { filesIndexed, filesFailed };
   }
 
   private collectFiles(root: string): string[] {
@@ -76,17 +103,19 @@ export class AstContextEngine {
     return result;
   }
 
-  private indexFile(filePath: string): void {
+  private indexFile(filePath: string): boolean {
     const source = readFileSync(filePath, "utf8");
-    const file = this.parseFileSafe(source);
-    if (!file) {
-      return;
+    const result = this.parseFileSafe(source);
+    if (!result.file) {
+      this.indexingErrors.set(filePath, result.error ?? "Unknown parsing error");
+      this.logger?.warn(`Failed to index file: ${filePath}`, { error: result.error });
+      return false;
     }
 
     const imports: string[] = [];
     const declarations = new Map<string, { start: number; end: number }>();
 
-    for (const node of file.program.body) {
+    for (const node of result.file.program.body) {
       this.collectTopLevelNode(node, imports, declarations);
     }
 
@@ -96,17 +125,28 @@ export class AstContextEngine {
       declarations,
       source,
     });
+    return true;
   }
 
-  private parseFileSafe(source: string): File | null {
+  private parseFileSafe(source: string): { file: File | null; error: string | null } {
     try {
-      return parse(source, {
+      const parsed = parse(source, {
         sourceType: "unambiguous",
         plugins: ["typescript", "jsx", "classProperties", "decorators-legacy"],
       });
-    } catch {
-      return null;
+      return { file: parsed, error: null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { file: null, error: errorMessage };
     }
+  }
+
+  public getIndexingErrors(): IndexingError[] {
+    return Array.from(this.indexingErrors.entries()).map(([filePath, error]) => ({ filePath, error }));
+  }
+
+  public getIndexedFileCount(): number {
+    return this.index.size;
   }
 
   private collectTopLevelNode(
